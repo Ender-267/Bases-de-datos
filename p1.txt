@@ -1,0 +1,177 @@
+PRODUCTOS{
+    nombre => PRIMARIO, CHAR
+    coffea => CHAR
+    varietal => CHAR
+    pais_origen => CHAR
+    tipo_tostado => ENUM
+    descafeinado => ENUM(bool)
+    //formato_comercializacion relacion 1..N
+}
+FORMATOS_COMERCIALIZACION{
+    producto => PRIMARIO, REFERENCIA(PRODUCTOS)
+    tipo => PRIMARIO, ENUM
+}
+TAMAÑO_FORMATO{
+    // Cada formato puede tener varios tamaños, relacion 1..N
+    formato => PRIMARIO, REFERENCIA(FORMATOS_COMERCIALIZACION)
+    cantidad => INT(>=0)
+    definicion_cantidad => ENUM('volumen', 'peso')
+}
+ARTICULOS(REFERENCIA){
+    producto => CHAR, REFERENCIA(PRODUCTOS)
+    //N referencia .. 1 productos
+    codigo_barras => PRIMARIO, INT
+    descripcion => CHAR
+    // Que el TAMAÑO_FORMATO que se referencia sea el mismo que el de PRODUCTOS debe de comprobarse con logica externa
+    envalaje_tamaño => INT, REFERENCIA(TAMAÑO_FORMATO(CANTIDAD))
+    precio_venta => INT(>=0)
+    stock => INT in range(min_stock, max_stock), DEFAULT(0)
+    min_stock => INT(>=0), DEFAULT(5)
+    max_stock => INT(>=0), DEFAULT(min_stock + 10) //Usar GENERATED ALWAYS AS
+    // Si el articulo esta en un pedido de compra, se guarda aqui. Si no esta en ninguna, se pone a NULL
+    comprado => REFERENCIA(COMPRA), NULL, ON DELETE SET NULL
+}
+COMPRAS{
+    cliente => REFERENCIA(CLIENTE_GENERICO), INT
+    fecha => DATE, PRIMARIO
+    direccion_entrega => PRIMARIO, REFERENCIA(DATOS_DIRECCION), CHAR?
+    tipo_facturacion => ENUM('COD', 'banco', 'tarjeta')
+    datos_tarjeta => REFERENCIA(DATOS_TARJETA), NULL
+    fecha_pago => DATE, NULL
+    fecha_entrega => DATE, NULL
+    // El precio individual y la cantidad esta guardado en Articulo
+    // Precio total es la combinacion de los precios individuales de todos los ARTICULOS, se calcula con logica externa
+    precio_total => INT(>=0), DEFAULT(0)
+
+    Si tipo_facturacion == 'tarjeta' Entoces datos_tarjeta != NULL Y fecha_pago == fecha
+    ELSE datos_tarjeta == NULL
+}
+
+PEDIDOS{
+    // Aunque solo puede haber un solo pedido activo por referencia,
+    // los pedidos satisfechos se guardan. Relacion 1 Articulo .. N Pedidos
+    referencia => CHAR, PRIMARIO, REFERENCIA(ARTICULOS)
+    fecha => PRIMARIO, DATE
+    estado => ENUM
+    // Unidades = max_stock - min_stock (Logica externa)
+    unidades => INT(>0)
+    proveedor => CHAR, REFERENCIA(PROVEEDORES), NULL, ON DELETE SET NULL
+    fecha_recepcion => DATE, NULL, (>fecha)
+    precio_total => INT(>0), NULL //Solo se actualiza al completarse el pedido (puede ser null)
+
+    SI estado == "Borrador" ENTONCES proveedor == NULL
+    SI estado == "fullfiled" ENTONCES fecha_recepcion != NULL y fecha_recepcion > fecha Y precio_total != NULL
+
+    // No se puede evitar que los pedidos sean cambiados tras su creacion como pide el enunciado (logica externa)
+
+    // La eleccion de proveedor se lleva a cabo con logica externa
+    // (prioridad de eleccion, min(tiempo_medio), max(pedidos_satisfechos), random; en ese orden)
+}
+
+PROVEEDORES{
+    nombre_registrado => SECUNDARIO, CHAR
+    cif => PRIMARIO, INT
+    nombre_completo => SECUNDARIO, CHAR
+    correo_electronico => SECUNDARIO, CHAR
+    numero_bancario => SECUNDARIO, INT
+    direccion_postal => SECUNDARIO, CHAR, REFERENCIA(DATOS_DIRECCION)
+    pais => CHAR
+
+    // tiempo_medio guarda el tiempo medio de envio de pedidos del ultimo año (necesario para eleccion de proveedores)(enunciado)
+    // se actualiza tiempo_medio mediante logica externa
+    tiempo_medio => INT(>=0), DEFAULT(0)
+    // pedidos_satisfechos guarda el numero de pedidos entregados en ultimo año (necesario para eleccion de proveedores)(enunciado)
+    // se actualiza tiempo_medio mediante logica externa
+    pedidos_satisfechos => INT(>=0), DEFAULT(0)
+}
+
+DATOS_TARJETA{
+    titular => CHAR
+    compañia => CHAR
+    numero => INT, PRIMARIO
+    fecha_vencimiento => DATE
+    // La tabla se usa tanto para clientes, como para otras cosas. Si no esta siendo usado para clientes, se deja en NULL
+    // Un cliente puede tener varias tarjetas (1 Cliente .. N Tarjetas)
+    cliente = REFERENCIA(CLIENTE_REGISTRADO), NULL
+}
+
+DATOS_DIRECCION{
+    tipo_via => CHAR, PRIMARIO
+    nombre_via => CHAR, PRIMARIO
+    numero_inmueble => INT, NULL, PRIMARIO
+    numero_bloque => INT, NULL, PRIMARIO
+    escalera => CHAR, NULL, PRIMARIO
+    piso => INT, NULL, PRIMARIO
+    puerta => CHAR, NULL, PRIMARIO
+    codigo_postal => INT, PRIMARIO
+    ciudad => CHAR, PRIMARIO
+    pais => CHAR, PRIMARIO
+    // La tabla se usa tanto para clientes, como para otras cosas. Si no esta siendo usado para clientes, se deja en NULL
+    // Un cliente puede tener varias direcciones (1 Cliente .. N Direcciones)
+    // Solo puede haber una direcion por localidad y cliente, esto se comprueba con logica externa
+    cliente = REFERENCIA(CLIENTE_REGISTRADO), NULL
+}
+
+CLIENTE_GENERICO{
+    id => INT, PRIMARIO
+    telefono => INT, NULL
+    correo_electronico => CHAR, NULL
+    // El nombre solo deja de ser nulo si se realiza una compra. Esto se controla con logica externa
+    nombre => CHAR, NULL, SECUNDARIA1
+    apellido1 => CHAR, NULL, SECUNDARIA1
+    apellido2 => CHAR, NULL, SECUNDARIA1
+    // El resto de datos de CLIENTE_GENERICO estan relacionados con compras y por lo tanto estan guardados en sus respectivas tablas
+}
+
+CLIENTE_REGISTRADO{
+    id_cliente_generico => PRIMARIO, INT, REFERENCIA(CLIENTE_GENERICO)
+    fecha_registro => DATE
+    // telefono y correo pueden ser null en cliente_generico pero no aqui
+    telefono => INT, REFERENCIA(CLIENTE_GENERICO(telefono)), NULL
+    correo_electronico => INT, REFERENCIA(CLIENTE_GENERICO(correo_electronico)), NULL
+    // El nombre en CLIENTE_REGISTRADO no puede ser NULL
+    nombre => CHAR, REFERENCIA(CLIENTE_GENERICO(nombre))
+    apellido1 => CHAR, REFERENCIA(CLIENTE_GENERICO(nombre))
+    apellido2 => CHAR, NULL, REFERENCIA(CLIENTE_GENERICO(nombre))
+    preferencia_contacto => ENUM('email', 'telefono', 'sms', 'whatsapp', 'facebook', 'wechat', 'qqmobile', 'snapchat', 'telegram'){
+        DEFAULT(
+            CASE 
+                WHEN telefono = NULL THEN 'email'
+                ELSE 'sms'
+            END
+        )
+    }
+    // Direcciones y tajetas se guardan en sus respectivas tablas y apuntan a esta
+}
+
+PUBLICACIONES{
+    id => INT, PRIMARIO
+    // asociado = producto o articulo
+    // Se considera que si la publicacion es de un articulo, se guarda tambien el producto asociado
+    producto => CHAR, REFERENCIA(PRODUCTOS)
+    articulo => INT, REFERENCIA(ARTICULOS), NULL
+    puntuacion => INT(entre 1 y 5)
+    likes => INT(>=0)
+    refrenda => BOOLEAN
+    cliente => INT, REFERENCIA(CLIENTE_REGISTRADO), ON DELETE SET NULL
+}
+
+OFERTAS{
+    // Un producto puede tener varios Proveedores
+    // Un proveedor puede proporcionar varios productos (No viene reflejado en el enunciado, pero lo asumimos)
+    // Relaccion N .. N
+    // Formamos tabla intermedia
+    proveedor => REFERENCIA(PROVEEDORES), ELIMINACION EN CASCADA, PRIMARIO
+    producto => REFERENCIA(PRODUCTOS), ELIMINACION EN CASCADA, PRIMARIO
+    precio => INT(>0)
+}
+
+DESCUENTOS{
+    // Solo hay un descuento por cliente (1..1), pero usando una tabla separada es mas ordenado
+    cliente => REFERENCIA(CLIENTE_REGISTRADO), PRIMARIO
+    porcentaje_a_descontar => INT(entre 0 y 100), PRIMARIO
+    fecha_expiracion => DATE, PRIMARIO
+    // El calculo del descuento se lleva a cabo con logica externa
+}
+
+// Nota: Se podria modelar pais como una tabla, pero sobrecomplica el diseño de forma innecesaria (En mi opinion)

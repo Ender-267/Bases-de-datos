@@ -1,0 +1,44 @@
+CREATE TABLE linea(
+    color VARCHAR2(10) NOT NULL,
+    nombre VARCHAR2(50) NOT NULL,
+    CONSTRAINT pk_nombre PRIMARY KEY(nombre)
+);
+
+CREATE TABLE estacion(
+    nombre VARCHAR2(50) NOT NULL,
+    accesible VARCHAR2(5) NOT NULL,
+    intecomunicacion VARCHAR2(10),
+    linea VARCHAR2(50) NOT NULL,
+    CONSTRAINT pk_nombre PRIMARY KEY(nombre),
+    CONSTRAINT chk_accesible CHECK (accesible in ('TRUE', 'FALSE'))
+    CONSTRAINT fk_nombre FOREIGN KEY(nombre) REFERENCES
+        linea(nombre) 
+);
+
+CREATE TABLE acceso(
+    numero NUMBER(2) NOT NULL,
+    estacion VARCHAR2(50) NOT NULL,
+    via VARCHAR2(100),
+    CONSTRAINT pk_numero PRIMARY KEY(numero),
+    CONSTRAINT fk_estacion FOREIGN KEY(estacion) REFERENCES estacion(nombre)
+);
+
+CREATE TABLE cochera(
+    id NUMBER(10) NOT NULL,
+    estacion VARCHAR2(50),
+    CONSTRAINT fk_id PRIMARY KEY(id)
+    CONSTRAINT fk_estacion FOREIGN KEY(estacion) REFERENCES estacion(nombre)
+);
+
+CREATE TABLE tren(
+    linea VARCHAR2(500),
+    matricula NUMBER(8) NOT NULL,
+    año_fabricacion DATE NOT NULL,
+    ultima_inspecion DATE,
+    cochera NUMBER(10),
+    CONSTRAINT chk_cochera CHECK((cochera IS NULL AND linea IS NULL) OR (cochera IS NOT NULL AND linea IS NOT NULL)),
+    CONSTRAINT chk2_cochera CHECK(cochera.estacion.linea = linea),
+    CONSTRAINT fk_cochera FOREIGN KEY (cochera) REFERENCES cochera(id),
+    CONSTRAINT pk_matricula PRIMARY KEY(matricula),
+    CONSTRAINT chk_fabricacion CHECK (ultima_inspecion > año_fabricacion)
+);
