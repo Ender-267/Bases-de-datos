@@ -14,8 +14,8 @@ FORMATOS_COMERCIALIZACION{
 TAMAÑO_FORMATO{
     // Cada formato puede tener varios tamaños, relacion 1..N
     formato => PRIMARIO, REFERENCIA(FORMATOS_COMERCIALIZACION)
-    cantidad => INT(>=0)
-    definicion_cantidad => ENUM('volumen', 'peso')
+    cantidad => PRIMARIO, INT(>=0)
+    definicion_cantidad => PRIMARIO, ENUM('volumen', 'peso')
 }
 ARTICULOS(REFERENCIA){
     producto => CHAR, REFERENCIA(PRODUCTOS)
@@ -23,20 +23,20 @@ ARTICULOS(REFERENCIA){
     codigo_barras => PRIMARIO, INT
     descripcion => CHAR
     // Que el TAMAÑO_FORMATO que se referencia sea el mismo que el de PRODUCTOS debe de comprobarse con logica externa
-    envalaje_tamaño => INT, REFERENCIA(TAMAÑO_FORMATO(CANTIDAD))
+    envalaje_tamaño => INT(>=0), REFERENCIA(TAMAÑO_FORMATO(CANTIDAD))
     precio_venta => INT(>=0)
     stock => INT in range(min_stock, max_stock), DEFAULT(0)
     min_stock => INT(>=0), DEFAULT(5)
-    max_stock => INT(>=0), DEFAULT(min_stock + 10) //Usar GENERATED ALWAYS AS
+    max_stock => INT(>=0), DEFAULT(15)
     // Si el articulo esta en un pedido de compra, se guarda aqui. Si no esta en ninguna, se pone a NULL
-    comprado => REFERENCIA(COMPRA), NULL, ON DELETE SET NULL
+    comprado => REFERENCIA(COMPRA), NULL, ON DELETE SET NULL, DEFAULT NULL
 }
 COMPRAS{
     cliente => REFERENCIA(CLIENTE_GENERICO), INT
     fecha => DATE, PRIMARIO
-    direccion_entrega => PRIMARIO, REFERENCIA(DATOS_DIRECCION), CHAR?
+    direccion_entrega => PRIMARIO, REFERENCIA(DATOS_DIRECCION(codigo_postal)), INT
     tipo_facturacion => ENUM('COD', 'banco', 'tarjeta')
-    datos_tarjeta => REFERENCIA(DATOS_TARJETA), NULL
+    datos_tarjeta => INT, REFERENCIA(DATOS_TARJETA), NULL
     fecha_pago => DATE, NULL
     fecha_entrega => DATE, NULL
     // El precio individual y la cantidad esta guardado en Articulo
@@ -50,7 +50,7 @@ COMPRAS{
 PEDIDOS{
     // Aunque solo puede haber un solo pedido activo por referencia,
     // los pedidos satisfechos se guardan. Relacion 1 Articulo .. N Pedidos
-    referencia => CHAR, PRIMARIO, REFERENCIA(ARTICULOS)
+    producto => CHAR, PRIMARIO, REFERENCIA(PRODUCTOS)
     fecha => PRIMARIO, DATE
     estado => ENUM
     // Unidades = max_stock - min_stock (Logica externa)
@@ -59,7 +59,7 @@ PEDIDOS{
     fecha_recepcion => DATE, NULL, (>fecha)
     precio_total => INT(>0), NULL //Solo se actualiza al completarse el pedido (puede ser null)
 
-    SI estado == "Borrador" ENTONCES proveedor == NULL
+    SI estado == "draft" ENTONCES proveedor == NULL
     SI estado == "fullfiled" ENTONCES fecha_recepcion != NULL y fecha_recepcion > fecha Y precio_total != NULL
 
     // No se puede evitar que los pedidos sean cambiados tras su creacion como pide el enunciado (logica externa)
@@ -92,7 +92,7 @@ DATOS_TARJETA{
     fecha_vencimiento => DATE
     // La tabla se usa tanto para clientes, como para otras cosas. Si no esta siendo usado para clientes, se deja en NULL
     // Un cliente puede tener varias tarjetas (1 Cliente .. N Tarjetas)
-    cliente = REFERENCIA(CLIENTE_REGISTRADO), NULL
+    cliente = INT, REFERENCIA(CLIENTE_REGISTRADO), NULL
 }
 
 DATOS_DIRECCION{
@@ -146,7 +146,6 @@ CLIENTE_REGISTRADO{
 
 PUBLICACIONES{
     id => INT, PRIMARIO
-    // asociado = producto o articulo
     // Se considera que si la publicacion es de un articulo, se guarda tambien el producto asociado
     producto => CHAR, REFERENCIA(PRODUCTOS)
     articulo => INT, REFERENCIA(ARTICULOS), NULL
@@ -169,7 +168,7 @@ OFERTAS{
 DESCUENTOS{
     // Solo hay un descuento por cliente (1..1), pero usando una tabla separada es mas ordenado
     cliente => REFERENCIA(CLIENTE_REGISTRADO), PRIMARIO
-    porcentaje_a_descontar => INT(entre 0 y 100), PRIMARIO
+    porcentaje_a_descontar => INT(entre 0 y 100),
     fecha_expiracion => DATE, PRIMARIO
     // El calculo del descuento se lleva a cabo con logica externa
 }
