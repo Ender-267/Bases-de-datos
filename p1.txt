@@ -125,6 +125,7 @@ CLIENTE_GENERICO{
 }
 
 CLIENTE_REGISTRADO{
+    nombre_usuario => CHAR, SECUNDARIO
     id_cliente_generico => PRIMARIO, INT, REFERENCIA(CLIENTE_GENERICO)
     fecha_registro => DATE
     preferencia_contacto => ENUM('email', 'telefono', 'sms', 'whatsapp', 'facebook', 'wechat', 'qqmobile', 'snapchat', 'telegram')
