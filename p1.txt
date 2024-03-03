@@ -22,8 +22,7 @@ ARTICULOS(REFERENCIA){
     //N referencia .. 1 productos
     codigo_barras => PRIMARIO, INT
     descripcion => CHAR
-    // Que el TAMAÑO_FORMATO que se referencia sea el mismo que el de PRODUCTOS debe de comprobarse con logica externa
-    envalaje_tamaño => INT(>=0), REFERENCIA(TAMAÑO_FORMATO(CANTIDAD))
+    cantidad => INT(>=0)
     precio_venta => INT(>=0)
     stock => INT in range(min_stock, max_stock), DEFAULT(0)
     min_stock => INT(>=0), DEFAULT(5)
@@ -74,7 +73,7 @@ PROVEEDORES{
     nombre_completo => SECUNDARIO, CHAR
     correo_electronico => SECUNDARIO, CHAR
     numero_bancario => SECUNDARIO, INT
-    direccion_postal => SECUNDARIO, CHAR, REFERENCIA(DATOS_DIRECCION)
+    direccion => SECUNDARIO, CHAR, REFERENCIA(DATOS_DIRECCION)
     pais => CHAR
 
     // tiempo_medio guarda el tiempo medio de envio de pedidos del ultimo año (necesario para eleccion de proveedores)(enunciado)
@@ -96,16 +95,18 @@ DATOS_TARJETA{
 }
 
 DATOS_DIRECCION{
-    tipo_via => CHAR, PRIMARIO
-    nombre_via => CHAR, PRIMARIO
-    numero_inmueble => INT, NULL, PRIMARIO
-    numero_bloque => INT, NULL, PRIMARIO
-    escalera => CHAR, NULL, PRIMARIO
-    piso => INT, NULL, PRIMARIO
-    puerta => CHAR, NULL, PRIMARIO
-    codigo_postal => INT, PRIMARIO
-    ciudad => CHAR, PRIMARIO
-    pais => CHAR, PRIMARIO
+    // Pongo coordenadas porque sirve como clave primaria
+    coordenadas => INT, PRIMARIO
+    tipo_via => CHAR
+    nombre_via => CHAR
+    numero_inmueble => INT, NULL
+    numero_bloque => INT, NULL
+    escalera => CHAR, NULL
+    piso => INT, NULL
+    puerta => CHAR, NULL
+    codigo_postal => INT
+    ciudad => CHAR
+    pais => CHAR
     // La tabla se usa tanto para clientes, como para otras cosas. Si no esta siendo usado para clientes, se deja en NULL
     // Un cliente puede tener varias direcciones (1 Cliente .. N Direcciones)
     // Solo puede haber una direcion por localidad y cliente, esto se comprueba con logica externa
@@ -126,20 +127,7 @@ CLIENTE_GENERICO{
 CLIENTE_REGISTRADO{
     id_cliente_generico => PRIMARIO, INT, REFERENCIA(CLIENTE_GENERICO)
     fecha_registro => DATE
-    // telefono y correo pueden ser null en cliente_generico pero no aqui
-    telefono => INT, REFERENCIA(CLIENTE_GENERICO(telefono)), NULL
-    correo_electronico => INT, REFERENCIA(CLIENTE_GENERICO(correo_electronico)), NULL
-    // El nombre en CLIENTE_REGISTRADO no puede ser NULL
-    nombre => CHAR, REFERENCIA(CLIENTE_GENERICO(nombre))
-    apellido1 => CHAR, REFERENCIA(CLIENTE_GENERICO(nombre))
-    apellido2 => CHAR, NULL, REFERENCIA(CLIENTE_GENERICO(nombre))
-    preferencia_contacto => ENUM('email', 'telefono', 'sms', 'whatsapp', 'facebook', 'wechat', 'qqmobile', 'snapchat', 'telegram'){
-        DEFAULT(
-            CASE 
-                WHEN telefono = NULL THEN 'email'
-                ELSE 'sms'
-            END
-        )
+    preferencia_contacto => ENUM('email', 'telefono', 'sms', 'whatsapp', 'facebook', 'wechat', 'qqmobile', 'snapchat', 'telegram')
     }
     // Direcciones y tajetas se guardan en sus respectivas tablas y apuntan a esta
 }
