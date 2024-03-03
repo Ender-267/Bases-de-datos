@@ -36,30 +36,13 @@ CREATE TABLE cliente_registrado(
 );
 
 CREATE TABLE producto(
-    nombre VARCHAR2(256) NOT NULL,
-    coffea VARCHAR2(32) NOT NULL,
-    varietal VARCHAR2(32) NOT NULL,
-    pais_origen VARCHAR2(64) NOT NULL,
+    nombre VARCHAR2(50) NOT NULL,
+    coffea VARCHAR2(20) NOT NULL,
+    varietal VARCHAR2(30) NOT NULL,
+    pais_origen VARCHAR2(15) NOT NULL,
     tipo_tostado VARCHAR2(16) NOT NULL,
-    descafeinado VARCHAR2(1) NOT NULL,
+    descafeinado VARCHAR2(12) NOT NULL,
     CONSTRAINT pk_producto PRIMARY KEY(nombre)
-);
-
-CREATE TABLE formato_comercializacion(
-    producto VARCHAR2(256) NOT NULL,
-    tipo VARCHAR2(16) NOT NULL,
-    CONSTRAINT pk_formato_comercializacion PRIMARY KEY (producto, tipo),
-    CONSTRAINT fk_formato_comercializacion FOREIGN KEY (producto) REFERENCES producto(nombre)
-);
-
-CREATE TABLE tamaño_formato(
-    formato VARCHAR2(256) NOT NULL,
-    tipo VARCHAR2(16) NOT NULL,
-    cantidad NUMBER(10) NOT NULL,
-    definicion_cantidad VARCHAR2(16) NOT NULL,
-    CONSTRAINT pk_tamano_formato PRIMARY KEY(formato, cantidad, definicion_cantidad),
-    CONSTRAINT ck_cantidad CHECK (cantidad>0),
-    CONSTRAINT fk_tamano_formato FOREIGN KEY (formato, tipo) REFERENCES formato_comercializacion(producto, tipo)
 );
 
 CREATE TABLE compra(
@@ -80,18 +63,20 @@ CREATE TABLE compra(
 );
 
 CREATE TABLE articulo(
-    producto VARCHAR2(256) NOT NULL,
-    codigo_barras NUMBER(16) NOT NULL,
-    descripcion VARCHAR2(256) NOT NULL,
-    cantidad NUMBER(8) NOT NULL,
-    precio_venta NUMBER(8,2) NOT NULL,
-    stock NUMBER(8) DEFAULT 0 NOT NULL,
-    min_stock NUMBER(8) DEFAULT 5 NOT NULL,
-    max_stock NUMBER(8) DEFAULT 15 NOT NULL,
+    producto VARCHAR2(50) NOT NULL,
+    codigo_barras NUMBER(15) NOT NULL,
+    embalaje_tamaño NUMBER(8) NOT NULL,
+    embalaje_tipo VARCHAR2(4) NOT NULL,
+    precio_venta NUMBER(14,2) NOT NULL,
+    stock NUMBER(5) DEFAULT 0 NOT NULL,
+    min_stock NUMBER(5) DEFAULT 5 NOT NULL,
+    max_stock NUMBER(5) DEFAULT 15 NOT NULL,
+    tipo_formato VARCHAR2(20) NOT NULL,
+    definicion_cantidad VARCHAR2(16) NOT NULL,
     comprado_fecha DATE DEFAULT NULL,
 	comprado_direccion NUMBER(16) DEFAULT NULL,
     CONSTRAINT pk_articulos PRIMARY KEY (codigo_barras),
-    CONSTRAINT ck_cantidad2 CHECK (cantidad>=0),
+    CONSTRAINT ck_embalaje_tamaño CHECK (embalaje_tamaño>=0),
     CONSTRAINT ck_precio_venta CHECK (precio_venta>=0),
     CONSTRAINT ck_stock CHECK (stock>=min_stock AND stock<=max_stock),
     CONSTRAINT ck_min_stock CHECK (min_stock>=0),
