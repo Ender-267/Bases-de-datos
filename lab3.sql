@@ -62,4 +62,4 @@ JOIN
 privs t2
 ON (t1.privacy_lvl<=t2.security_lvl);
 
--- @C:\Users\aulavirtual\Desktop\script.sql;
+-- @C:\Users\aulavirtual\Desktop\script.sql;se
