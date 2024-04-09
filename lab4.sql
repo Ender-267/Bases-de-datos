@@ -7,6 +7,7 @@ DROP VIEW ref_contacts CASCADE CONSTRAINT;
 DROP VIEW contracts CASCADE CONSTRAINT;
 DROP TABLE privs CASCADE CONSTRAINT;
 DROP VIEW clauses CASCADE CONSTRAINT;
+DROP TABLE tabla1 CASCADE CONSTRAINT;
 
 CREATE TABLE contracts_ALL(
 referenc 		VARCHAR2(25) PRIMARY KEY,
@@ -62,4 +63,47 @@ JOIN
 privs t2
 ON (t1.privacy_lvl<=t2.security_lvl);
 
--- @C:\Users\aulavirtual\Desktop\script.sql;se
+CREATE TRIGGER ins_contracts
+INSTEAD OF INSERT ON contracts
+FOR EACH ROW
+BEGIN
+    INSERT INTO contracts_ALL
+    VALUES(:NEW.referenc, :NEW.signature);
+END ins_contracts;
+
+CREATE OR REPLACE TRIGGER CHK_clause_date
+BEFORE INSERT OR UPDATE OF cl_date ON clauses_ALL
+FOR EACH ROW
+DECLARE 	signdate DATE;
+		baddate EXCEPTION;
+BEGIN
+   SELECT signature INTO signdate
+	FROM contracts_ALL WHERE referenc=:NEW.referenc;
+   IF :NEW.cl_date > signdate
+     THEN :NEW.cl_date := signdate;
+   END IF;
+END CHK_clause_date;
+
+CREATE OR REPLACE TRIGGER CHK_clause_date
+BEFORE INSERT OR UPDATE OF cl_date ON clauses_ALL
+FOR EACH ROW
+DECLARE 	signdate DATE;
+		baddate EXCEPTION;
+BEGIN
+   SELECT signature INTO signdate
+	FROM contracts_ALL WHERE referenc=:NEW.referenc;
+   IF :NEW.cl_date > signdate
+     THEN RAISE baddate;
+   END IF;
+EXCEPTION
+  WHEN	 baddate THEN DBMS_OUTPUT.PUT_LINE('Wrong DATE!');
+END CHK_clause_date;
+
+CREATE TRIGGER delete_clause
+  INSTEAD OF DELETE ON clauses
+BEGIN
+  UPDATE clauses_ALL set userid=USER, fecha_dlt =SYSTATE  
+    WHERE referenc=:OLD.referenc AND n_order=:OLD.n_order;
+END;
+
+-- @C:\Users\aulavirtual\Desktop\script.sql;
