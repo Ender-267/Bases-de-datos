@@ -193,3 +193,6 @@ INSERT INTO Client_Lines (orderdate, username, town, country, barcode, cardnum, 
 
 COMMIT;
 /
+
+
+

@@ -9,31 +9,44 @@ CREATE OR REPLACE PACKAGE BODY Caffeine AS
     BEGIN
         UPDATE Replacements r
         SET units = (
-            SELECT ref.max_stock - ref.cur_stock
+            SELECT ref.max_stock - ref.cur_stock as units
                 FROM Replacements rep
-                JOIN Supply_lines sup ON rep.barCode = sup.barCode
-                JOIN References ref ON sup.barCode = ref.barcode
-                WHERE rep.status = 'D' AND rep.barCode = r.barCode
+                JOIN References ref ON rep.barCode = ref.barcode
+                WHERE rep.status = 'D' AND rep.barCode = r.barCode AND r.orderdate = rep.orderdate
         );
         
 
         UPDATE Replacements r
-        SET taxId = 
-        (
-            SELECT a.prov
-            FROM (
-                SELECT rep.taxID as prov, MIN(sup.cost)
-                FROM Replacements rep
-                JOIN Supply_lines sup ON rep.barCode = sup.barCode
-                WHERE rep.status = 'D'
-                GROUP BY rep.taxID
-                ) a
-            WHERE a.prov = r.taxID
+        SET taxId = (
+            SELECT taxID
+            FROM Supply_Lines sup
+            WHERE sup.barCode = r.barCode
+            AND sup.cost = (
+                SELECT MIN(cost)
+                FROM Supply_Lines
+                WHERE barCode = sup.barCode
+            )
+        AND ROWNUM = 1 -- Puede que haya precios repetidos
         );
 
-        UPDATE Replacements
+
+        UPDATE Replacements r
+        SET payment = 
+            (
+                SELECT sup.cost*rep.units
+                FROM Replacements rep
+                JOIN Supply_lines sup ON rep.barCode = sup.barCode AND rep.taxID = sup.taxID
+                WHERE rep.status = 'D' AND r.barCode = rep.barCode AND r.orderdate = rep.orderdate
+            );
+
+
+        UPDATE Replacements r
         SET orderdate = SYSDATE, status = 'P'
         WHERE status = 'D';
+        EXCEPTION
+            WHEN DUP_VAL_ON_INDEX THEN
+                DBMS_OUTPUT.PUT_LINE('SOLO SE PERMITE UN PEDIDO POR REFERENCIA Y DIA');
+
     END set_replacement_orders;
 
     PROCEDURE provider_info (
@@ -53,10 +66,8 @@ CREATE OR REPLACE PACKAGE BODY Caffeine AS
     BEGIN   
         -- pedidos
         SELECT COUNT(*) INTO pedidos
-            FROM Providers prov
-            JOIN Supply_lines sup ON (prov.taxID = sup.taxId)
-            JOIN Replacements rep ON (rep.barCode = sup.barCode)
-        WHERE (rep.status = 'P' OR rep.status = 'F') AND prov.taxId = cif;
+            FROM Replacements rep 
+        WHERE (rep.status = 'P' OR rep.status = 'F') AND rep.taxId = cif;
         
         -- tiempo de entrega
         SELECT AVG(rep.deldate - rep.orderdate) INTO tiempo_entrega
@@ -66,46 +77,48 @@ CREATE OR REPLACE PACKAGE BODY Caffeine AS
             WHERE rep.status = 'F' AND prov.taxId = cif;
 
 
-        DBMS_OUTPUT.PUT_LINE('El numero de pedidos es' || TO_CHAR(pedidos));
-        DBMS_OUTPUT.PUT_LINE('Tiempo medio de entrega es' || TO_CHAR(tiempo_entrega));
+        DBMS_OUTPUT.PUT_LINE('El numero de pedidos es ' || TO_CHAR(pedidos));
+        DBMS_OUTPUT.PUT_LINE('Tiempo medio de entrega es ' || TO_CHAR(tiempo_entrega));
         
         FOR i IN 
         (
-            SELECT ref.barCode
-                FROM References ref
-                JOIN Supply_lines sup ON (ref.barCode = sup.barCode)
-                WHERE sup.taxId = cif
+            SELECT barCode
+                FROM Supply_Lines
+                WHERE taxID = cif
         )
         LOOP
-            SELECT cost INTO coste_actual
-                FROM Replacements rep
-                JOIN Supply_lines sup ON (rep.barCode = sup.barCode AND rep.taxId = sup.taxId)
-                WHERE sup.taxId = cif AND i.barCode = sup.barCode AND orderdate = (
-                    -- Escoger ultimo pedido
-                    SELECT MAX(orderdate) FROM Replacements 
-                    WHERE
-                    rep.barCode = sup.barCode AND rep.taxId = sup.taxId AND sup.taxId = cif
-                );
-            
-            SELECT MAX(cost) INTO coste_max
-                FROM Replacements rep
-                JOIN Supply_lines sup ON (rep.barCode = sup.barCode AND rep.taxId = sup.taxId)
-                WHERE sup.taxId = cif AND i.barCode = sup.barCode;
+            -- Aunque los Replacements no guardan el coste directamente, lo podemos conseguir con 
+            -- precio_total/unidades
+            SELECT payment/units INTO coste_actual
+                FROM Replacements
+                WHERE taxID = cif AND i.barCode = barCode
+                AND orderdate = 
+                    (
+                    SELECT MAX(orderdate)
+                    FROM Replacements
+                    WHERE taxID = cif AND i.barCode = barCode
+                    );
 
-            SELECT MAX(cost) INTO segundo_coste_max
-                FROM Replacements rep
-                JOIN Supply_lines sup ON (rep.barCode = sup.barCode AND rep.taxId = sup.taxId)
-                WHERE sup.taxId = cif AND i.barCode = sup.barCode AND coste_actual <> coste_max;
 
-            SELECT AVG(cost) INTO coste_promedio
-                FROM Replacements rep
-                JOIN Supply_lines sup ON (rep.barCode = sup.barCode AND rep.taxId = sup.taxId)
-                WHERE sup.taxId = cif AND i.barCode = sup.barCode;
+            SELECT MAX(payment/units) INTO coste_max
+                FROM Replacements
+                WHERE taxID = cif AND i.barCode = barCode
+                AND orderdate > ADD_MONTHS(SYSDATE, -12);
+                
+            SELECT MAX(payment/units) INTO segundo_coste_max
+                FROM Replacements
+                WHERE taxID = cif AND i.barCode = barCode
+                AND orderdate > ADD_MONTHS(SYSDATE, -12)
+                AND payment/units < coste_max;
+
+            SELECT MIN(payment/units) INTO coste_minimo
+                FROM Replacements
+                WHERE taxID = cif AND i.barCode = barCode
+                AND orderdate > ADD_MONTHS(SYSDATE, -12);
             
-            SELECT MIN(cost) INTO coste_minimo
-                FROM Replacements rep
-                JOIN Supply_lines sup ON (rep.barCode = sup.barCode AND rep.taxId = sup.taxId)
-                WHERE sup.taxId = cif AND sup.barCode = i.barCode;
+            SELECT AVG(payment/units) INTO coste_promedio
+                FROM Replacements
+                WHERE taxID = cif AND i.barCode = barCode;
 
             diferencia_coste_promedio := coste_actual - coste_promedio;
             IF coste_actual <> coste_max THEN
@@ -120,7 +133,6 @@ CREATE OR REPLACE PACKAGE BODY Caffeine AS
             DBMS_OUTPUT.PUT_LINE('La diferencia del coste actual con el promedio es ' || TO_CHAR(diferencia_coste_promedio));
             DBMS_OUTPUT.PUT_LINE('La diferencia del coste maximo con el promedio es ' || TO_CHAR(diferencia_coste_max));
         END LOOP;
-
     END provider_info;
 END Caffeine;
 /
