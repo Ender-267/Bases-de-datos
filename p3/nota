@@ -1,7 +1,11 @@
 @C:\Users\aulavirtual\Desktop\creacion.sql
 
+@C:\Users\aulavirtual\Desktop\create_mod.sql
+
 @C:\Users\aulavirtual\Desktop\insercion.sql
 
 @C:\Users\aulavirtual\Desktop\carga.sql
 
 @C:\Users\aulavirtual\Desktop\eval.sql
+
+exec PKG_COSTES.RUN_TEST(100);
